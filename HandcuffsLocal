@@ -1,0 +1,64 @@
+--// From EpicGamer27's handcuff tutorial on yt; https://www.youtube.com/watch?v=RTyRRlYVvWc \\--
+
+
+-- Services
+local PlayerService = game:GetService('Players')
+local ReplicatedStorage = game:GetService('ReplicatedStorage')
+local TeamService = game:GetService('Teams')
+local RunService = game:GetService('RunService')
+local uis = game:GetService('UserInputService')
+
+-- Refrences 
+local Player = PlayerService.LocalPlayer
+local Assets = ReplicatedStorage:WaitForChild('Assets')
+local ArrestPrompt = Assets:WaitForChild('ArrestPrompt')
+local CuffEvent = ReplicatedStorage:WaitForChild('Remotes'):WaitForChild('CuffEvent')
+
+local Tool = script.Parent
+
+local Prompts = {}
+
+local function OnEquip()
+-- Prevents exploiters/glitchers from using cuffs on a different team
+	if Player.TeamColor ~= TeamService["Police"].TeamColor then
+		return warn('Player is not on the police team!')
+	end
+
+	for _, GamePlayer in ipairs(PlayerService:GetPlayers()) do
+		if GamePlayer.TeamColor == TeamService.Criminal.TeamColor then
+			if GamePlayer.Character and GamePlayer.Character.Humanoid.Health > 0 then
+
+				if not GamePlayer:FindFirstChild('Cuffed') then
+					local ClonedPrompt = ArrestPrompt:Clone()
+					ClonedPrompt.Parent = GamePlayer.Character.HumanoidRootPart
+
+					table.insert(Prompts, ClonedPrompt)
+				end
+
+			end
+		end
+	end
+
+	for Each, Prompt in ipairs(Prompts) do
+		Prompt.Triggered:Connect(function()
+			local Victim = PlayerService:GetPlayerFromCharacter(Prompt.Parent.Parent)
+			if Victim then
+				CuffEvent:FireServer(Victim)
+				Prompt.Enabled = false
+				table.remove(Prompts, Each)
+				Prompt:Destroy()
+			end
+		end)
+	end
+end
+
+local function OnUnEquip()
+	for _, Prompt in ipairs(Prompts) do
+		Prompt:Destroy()
+	end
+
+	table.clear(Prompts)
+end
+
+Tool.Unequipped:Connect(OnUnEquip)
+Tool.Equipped:Connect(OnEquip)
