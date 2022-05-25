@@ -1,0 +1,28 @@
+--// From EpicGamer27's handcuff tutorial on yt; https://www.youtube.com/watch?v=RTyRRlYVvWc \\--
+
+local dataStoreService = game:GetService("DataStoreService")
+local cashData = dataStoreService:GetDataStore("CashData")
+
+game.Players.PlayerAdded:Connect(function(player)
+    local leaderstats = Instance.new("Folder")
+    leaderstats.Name = "leaderstats"
+    leaderstats.Parent = player
+
+    local coins = Instance.new("IntValue")
+    coins.Name = "Cash"
+    coins.Value = cashData:GetAsync(player.UserId) or 0
+    coins.Parent = leaderstats
+
+    local arrests = Instance.new("IntValue",player)
+    arrests.Name = "Arrests"
+
+    player.CharacterAdded:Connect(function(char)
+        player.Robbing.Value = false
+        player.CashCollected.Value = 0
+
+        coins.Changed:Connect(function()
+            cashData:SetAsync(player.UserId,coins.Value)
+        end)
+    end)
+end)
+
