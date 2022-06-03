@@ -1,0 +1,166 @@
+--// From EpicGamer27's handcuff tutorial on yt; https://www.youtube.com/watch?v=RTyRRlYVvWc \\--
+
+-- Main script
+-- ARREST SYSTEM 
+
+-- Services
+local PlayerService = game:GetService('Players')
+local ReplicatedStorage = game:GetService('ReplicatedStorage')
+local TeamService = game:GetService('Teams')
+local PhysicService = game:GetService('PhysicsService')
+
+-- Refrences
+local Remotes = ReplicatedStorage.Remotes
+local CuffRemote = Remotes.CuffEvent
+local PlayerGroup = PhysicService:CreateCollisionGroup('PlayerGroup')
+local PartGroup = PhysicService:CreateCollisionGroup('PartGroup')
+
+PhysicService:CollisionGroupSetCollidable('PartGroup', 'PlayerGroup', false)
+-- Functions
+
+local function OnCuff(Officer, Victim)
+	-- Make sure they exist and haven't left the game yet.
+	if Officer and Victim then
+		-- Make sure neither of them are dead.
+		if Officer.Character.Humanoid.Health > 0 and Victim.Character.Humanoid.Health > 0 then
+			-- Make sure that the player hasn't been cuffed by another officer
+			if Victim:FindFirstChild('Cuffed') then
+				return warn('Player cuffed by another officer')
+			end
+            
+            -- Make sure their within 15 studs
+			if (Victim.Character.Head.Position - Officer.Character.Head.Position).Magnitude > 15 then
+				return warn('Too far away!')
+			end
+
+			-- Prevent any other officers cuffing the victim
+			local CuffedValue = Instance.new('IntValue')
+			CuffedValue.Name = 'Cuffed'
+			CuffedValue.Value = 1
+			CuffedValue.Parent = Victim
+
+			-- Play cuffed animation
+			local CurrentAnimations = Victim.Character.Humanoid:GetPlayingAnimationTracks()
+			-- Stop any current animations (such as walking)
+			for i, track in pairs (CurrentAnimations) do
+				track:Stop()
+			end
+
+			Victim.Character.Humanoid.WalkSpeed = 0
+			Victim.Character.Humanoid.JumpPower = 40		
+			
+			local CuffAnimation = Instance.new('Animation')
+            CuffAnimation.AnimationId = 'rbxassetid://8722758589' -- Use the animation in the model and export it as your own anim if you want to use mine.
+			CuffAnimation.Parent = Victim.Character
+
+			local LoadedCuff = Victim.Character.Humanoid:LoadAnimation(CuffAnimation)
+            LoadedCuff:Play()
+            
+            wait(3.5)
+            
+            Victim.Character:PivotTo(CFrame.new(25.041,5.4,22.361)) -- Set the numbers to be your jail's position/origin position.
+            Victim.Cuffed:Destroy()
+            Officer.leaderstats.Cash.Value = Officer.leaderstats.Cash.Value + 250
+            Victim.Character.Humanoid.WalkSpeed = 16
+            Victim.Character.Humanoid.JumpPower = 50
+            LoadedCuff:Stop()
+        end
+    end
+end
+
+CuffRemote.OnServerEvent:Connect(OnCuff)
+
+--localscript
+--// From EpicGamer27's handcuff tutorial on yt; https://www.youtube.com/watch?v=RTyRRlYVvWc \\--
+
+
+-- Services
+local PlayerService = game:GetService('Players')
+local ReplicatedStorage = game:GetService('ReplicatedStorage')
+local TeamService = game:GetService('Teams')
+local RunService = game:GetService('RunService')
+local uis = game:GetService('UserInputService')
+
+-- Refrences 
+local Player = PlayerService.LocalPlayer
+local Assets = ReplicatedStorage:WaitForChild('Assets')
+local ArrestPrompt = Assets:WaitForChild('ArrestPrompt')
+local CuffEvent = ReplicatedStorage:WaitForChild('Remotes'):WaitForChild('CuffEvent')
+
+local Tool = script.Parent
+
+local Prompts = {}
+
+local function OnEquip()
+-- Prevents exploiters/glitchers from using cuffs on a different team
+	if Player.TeamColor ~= TeamService["Police"].TeamColor then
+		return warn('Player is not on the police team!')
+	end
+
+	for _, GamePlayer in ipairs(PlayerService:GetPlayers()) do
+		if GamePlayer.TeamColor == TeamService.Criminal.TeamColor then
+			if GamePlayer.Character and GamePlayer.Character.Humanoid.Health > 0 then
+
+				if not GamePlayer:FindFirstChild('Cuffed') then
+					local ClonedPrompt = ArrestPrompt:Clone()
+					ClonedPrompt.Parent = GamePlayer.Character.HumanoidRootPart
+
+					table.insert(Prompts, ClonedPrompt)
+				end
+
+			end
+		end
+	end
+
+	for Each, Prompt in ipairs(Prompts) do
+		Prompt.Triggered:Connect(function()
+			local Victim = PlayerService:GetPlayerFromCharacter(Prompt.Parent.Parent)
+			if Victim then
+				CuffEvent:FireServer(Victim)
+				Prompt.Enabled = false
+				table.remove(Prompts, Each)
+				Prompt:Destroy()
+			end
+		end)
+	end
+end
+
+local function OnUnEquip()
+	for _, Prompt in ipairs(Prompts) do
+		Prompt:Destroy()
+	end
+
+	table.clear(Prompts)
+end
+
+Tool.Unequipped:Connect(OnUnEquip)
+Tool.Equipped:Connect(OnEquip)
+
+-- datastore script
+--// From EpicGamer27's handcuff tutorial on yt; https://www.youtube.com/watch?v=RTyRRlYVvWc \\--
+
+local dataStoreService = game:GetService("DataStoreService")
+local cashData = dataStoreService:GetDataStore("CashData")
+
+game.Players.PlayerAdded:Connect(function(player)
+    local leaderstats = Instance.new("Folder")
+    leaderstats.Name = "leaderstats"
+    leaderstats.Parent = player
+
+    local coins = Instance.new("IntValue")
+    coins.Name = "Cash"
+    coins.Value = cashData:GetAsync(player.UserId) or 0
+    coins.Parent = leaderstats
+
+    local arrests = Instance.new("IntValue",player)
+    arrests.Name = "Arrests"
+
+    player.CharacterAdded:Connect(function(char)
+        player.Robbing.Value = false
+        player.CashCollected.Value = 0
+
+        coins.Changed:Connect(function()
+            cashData:SetAsync(player.UserId,coins.Value)
+        end)
+    end)
+end)
